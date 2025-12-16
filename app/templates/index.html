@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Social Insight Lab</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header>
+    <p class="badge">AI-powered listening • Multi-source scraping • Sentiment intelligence</p>
+    <h1>Social Insight Lab</h1>
+    <p style="color:#9ca3af; max-width:720px; margin:12px auto 0 auto;">
+      Launch end-to-end intelligence jobs: gather up to {{ default_limit }} recent records, analyze sentiment & geography,
+      then visualize and export polished reports.
+    </p>
+  </header>
+
+  <div class="container grid two">
+    <div class="card">
+      <h2>Start a research job</h2>
+      <form method="post" action="/jobs" style="display:flex; flex-direction:column; gap:12px; margin-top:12px;">
+        <label>
+          <span>Topic, product, or phrase</span>
+          <input type="text" name="query" placeholder="e.g. EV charging experience" required>
+        </label>
+        <label>
+          <span>Volume to crawl (default {{ default_limit }})</span>
+          <input type="number" name="limit" min="10" max="100000" value="{{ default_limit }}">
+        </label>
+        <button type="submit">Launch analysis</button>
+      </form>
+    </div>
+    <div class="card">
+      <h2>Recent jobs</h2>
+      {% if jobs %}
+      <table>
+        <thead>
+          <tr><th>Query</th><th>Records</th><th>Status</th><th>Created</th></tr>
+        </thead>
+        <tbody>
+          {% for job in jobs %}
+          <tr>
+            <td><a href="/jobs/{{ job.id }}" style="color:#22d3ee; text-decoration:none;">{{ job.query }}</a></td>
+            <td>{{ job.limit }}</td>
+            <td><span class="status-pill status-{{ job.status.value }}">{{ job.status.value.title() }}</span></td>
+            <td>{{ job.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+        <p style="color:#9ca3af;">No jobs yet. Launch your first insight job to see real-time analysis.</p>
+      {% endif %}
+    </div>
+  </div>
+  <div class="footer">Built for resilient, always-on market intelligence.</div>
+</body>
+</html>

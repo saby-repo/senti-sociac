@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Insight for {{ job.query }}</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header>
+    <p class="badge">Job #{{ job.id }}</p>
+    <h1>{{ job.query }}</h1>
+    <p style="color:#9ca3af;">Review status, explore sentiment, demographics, and export assets for reporting.</p>
+    <div style="margin-top:10px;">
+      <span class="status-pill status-{{ job.status.value }}">{{ job.status.value.title() }}</span>
+      {% if job.completed_at %}<span class="badge">Completed {{ job.completed_at.strftime('%Y-%m-%d %H:%M') }}</span>{% endif %}
+    </div>
+  </header>
+
+  <div class="container grid two">
+    <div class="card">
+      <div class="banner">
+        <div>
+          <strong>Collection scope</strong>
+          <p style="margin:4px 0; color:#9ca3af;">{{ job.limit }} recent records targeted across news, social, and video sources.</p>
+        </div>
+        <div class="actions">
+          <a href="/">Launch another</a>
+          {% if analysis %}
+          <a href="/jobs/{{ job.id }}/export/csv">Export CSV</a>
+          <a href="/jobs/{{ job.id }}/export/pdf">Download PDF</a>
+          {% endif %}
+        </div>
+      </div>
+
+      {% if not analysis %}
+        <p style="color:#9ca3af; margin-top:12px;">Data collection and analysis are running. Refresh in a moment.</p>
+      {% else %}
+        <div class="grid two" style="margin-top:16px;">
+          <div class="stat">
+            <h3>Records analyzed</h3>
+            <strong>{{ analysis.total_count }}</strong>
+          </div>
+          <div class="stat">
+            <h3>Average sentiment</h3>
+            <strong>{{ '%.2f' % analysis.average_score }}</strong>
+          </div>
+          <div class="stat">
+            <h3>Positive</h3>
+            <strong style="color:#22c55e;">{{ analysis.positive_count }}</strong>
+          </div>
+          <div class="stat">
+            <h3>Neutral</h3>
+            <strong style="color:#f97316;">{{ analysis.neutral_count }}</strong>
+          </div>
+          <div class="stat">
+            <h3>Negative</h3>
+            <strong style="color:#f87171;">{{ analysis.negative_count }}</strong>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <h3>Recent mentions (sample)</h3>
+      {% if posts_preview %}
+      <table>
+        <thead><tr><th>Source</th><th>Region</th><th>Sentiment</th><th>Content</th></tr></thead>
+        <tbody>
+          {% for post in posts_preview %}
+          <tr>
+            <td>{{ post.source }}</td>
+            <td>{{ post.author_location }}</td>
+            <td>{{ post.sentiment_label.title() }}</td>
+            <td>{{ post.content }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p style="color:#9ca3af;">Data still loading.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if analysis %}
+  <div class="container card">
+    <h2>Visual intelligence</h2>
+    <div class="grid two">
+      <div class="chart">
+        <img src="data:image/png;base64,{{ analysis.charts_dict()['sentiment'] }}" alt="Sentiment Chart" style="width:100%; border-radius:10px;" />
+      </div>
+      <div class="chart">
+        <img src="data:image/png;base64,{{ analysis.charts_dict()['sources'] }}" alt="Source Chart" style="width:100%; border-radius:10px;" />
+      </div>
+      <div class="chart">
+        <img src="data:image/png;base64,{{ analysis.charts_dict()['locations'] }}" alt="Location Chart" style="width:100%; border-radius:10px;" />
+      </div>
+      <div class="chart">
+        <img src="data:image/png;base64,{{ analysis.charts_dict()['timeline'] }}" alt="Timeline Chart" style="width:100%; border-radius:10px;" />
+      </div>
+    </div>
+    <div class="actions" style="margin-top:12px;">
+      <a href="/jobs/{{ job.id }}/export/chart/sentiment">Save sentiment chart</a>
+      <a href="/jobs/{{ job.id }}/export/chart/locations">Save demographics chart</a>
+      <a href="/jobs/{{ job.id }}/export/chart/sources">Save source chart</a>
+      <a href="/jobs/{{ job.id }}/export/chart/timeline">Save timeline chart</a>
+    </div>
+  </div>
+
+  <div class="container grid two">
+    <div class="card">
+      <h3>Top regions</h3>
+      <table>
+        <thead><tr><th>Region</th><th>Mentions</th></tr></thead>
+        <tbody>
+          {% for loc, count in analysis.top_locations_dict().items() %}
+          <tr><td>{{ loc }}</td><td>{{ count }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h3>Top sources</h3>
+      <table>
+        <thead><tr><th>Channel</th><th>Mentions</th></tr></thead>
+        <tbody>
+          {% for src, count in analysis.top_sources_dict().items() %}
+          <tr><td>{{ src }}</td><td>{{ count }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="footer">Need alerts? Wire up Notifier to email, Slack, or webhooks for instant delivery.</div>
+</body>
+</html>
