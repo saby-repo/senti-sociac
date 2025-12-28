@@ -9,7 +9,7 @@ A FastAPI-powered sentiment and demographic research tool that simulates large-s
 - **Visualization + exports**: inline charts (Matplotlib), CSV data export, per-chart PNG downloads, and a branded PDF report.
 - **Notifications stub**: plug-in notifier ready to connect to email/SMS/webhooks.
 
-> Note: Crawling uses deterministic synthetic data for offline friendliness. Swap `Collector` with a real scraper to go production.
+> Note: Data now comes from real APIs (Twitter/X v2 recent search, Reddit via PRAW, and NewsAPI). Provide valid credentials in your environment to collect fresh posts; jobs will fail if no data can be retrieved.
 
 ## Getting started
 
@@ -48,6 +48,12 @@ pytest
 - `app/static/styles.css` — Dark UI styling.
 
 ## Extending
-- Replace `Collector.collect` with calls to real social/news APIs or scrapers.
+- Configure additional sources by extending `Collector` with more API clients and normalizers.
+- Required environment variables:
+  - `TWITTER_BEARER_TOKEN`
+  - `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USER_AGENT`
+  - `NEWSAPI_KEY`
+- Install the optional `praw` dependency (`pip install praw`) to enable Reddit collection.
+- Add your own sentiment model by swapping `SimpleSentimentAnalyzer` with a richer classifier.
 - Wire `Notifier` to email/SMS/Slack for alerting when jobs finish.
 - Scale out with a queue (Celery/RQ) and cloud database for production volume.

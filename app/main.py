@@ -163,9 +163,10 @@ def export_pdf(job_id: int, db: Session = Depends(get_session)):
             pdf.image(tmp.name, w=180)
         os.unlink(tmp.name)
 
-    output = pdf.output(dest="S").encode("latin1")
+    pdf_output = pdf.output(dest="S")
+    output_bytes = pdf_output.encode("latin1") if isinstance(pdf_output, str) else bytes(pdf_output)
     headers = {"Content-Disposition": f"attachment; filename=job-{job_id}-report.pdf"}
-    return StreamingResponse(io.BytesIO(output), media_type="application/pdf", headers=headers)
+    return StreamingResponse(io.BytesIO(output_bytes), media_type="application/pdf", headers=headers)
 
 
 @app.get("/jobs/{job_id}/export/chart/{chart_name}")
