@@ -41,6 +41,16 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 Open **http://localhost:8000**, type a query (e.g. `EV charging`, `ChatGPT`, `iran missile`), and hit **Launch Analysis**.
 
+### Stop the server
+
+```bash
+# Windows
+cmd.exe /c "taskkill /F /IM python.exe /T"
+
+# Mac/Linux
+pkill -f "uvicorn app.main:app"
+```
+
 ### Environment (optional)
 
 Copy `.env.example` to `.env`. The only variable you may want to set is:
