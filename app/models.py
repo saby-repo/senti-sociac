@@ -1,12 +1,16 @@
 import enum
 import json
-from datetime import datetime
-from typing import Dict, Optional
+from datetime import datetime, timezone
+from typing import Any, Dict
 
 from sqlalchemy import Column, DateTime, Enum, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 
 from .database import Base
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class JobStatus(str, enum.Enum):
@@ -24,8 +28,8 @@ class Job(Base):
     limit = Column(Integer, default=50000)
     status = Column(Enum(JobStatus), default=JobStatus.pending, nullable=False)
     message = Column(String, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    completed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=_utcnow)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
 
     analysis = relationship("Analysis", uselist=False, back_populates="job")
     posts = relationship("Post", back_populates="job", cascade="all, delete-orphan")
@@ -39,7 +43,8 @@ class Post(Base):
     source = Column(String, nullable=False)
     author_location = Column(String, nullable=False)
     content = Column(Text, nullable=False)
-    collected_at = Column(DateTime, default=datetime.utcnow)
+    url = Column(String, nullable=False, default="")   # link to original article
+    collected_at = Column(DateTime(timezone=True), default=_utcnow)
     sentiment_label = Column(String, nullable=False)
     sentiment_score = Column(Float, nullable=False)
 
@@ -60,8 +65,10 @@ class Analysis(Base):
     top_sources = Column(Text, default="{}")
     day_histogram = Column(Text, default="{}")
     charts = Column(Text, default="{}")
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # Per-source sentiment counts + geo coordinates for map pins
+    source_sentiments = Column(Text, default="{}")
+    created_at = Column(DateTime(timezone=True), default=_utcnow)
+    updated_at = Column(DateTime(timezone=True), default=_utcnow)
 
     job = relationship("Job", back_populates="analysis")
 
@@ -77,6 +84,9 @@ class Analysis(Base):
     def charts_dict(self) -> Dict[str, str]:
         return json.loads(self.charts or "{}")
 
+    def source_sentiments_dict(self) -> Dict[str, Any]:
+        return json.loads(self.source_sentiments or "{}")
+
     def set_top_locations(self, data: Dict[str, int]):
         self.top_locations = json.dumps(data)
 
@@ -88,3 +98,9 @@ class Analysis(Base):
 
     def set_charts(self, data: Dict[str, str]):
         self.charts = json.dumps(data)
+
+    def set_source_sentiments(self, data: Dict[str, Any]):
+        self.source_sentiments = json.dumps(data)
+
+    def touch(self):
+        self.updated_at = _utcnow()
