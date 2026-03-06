@@ -3,137 +3,397 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Insight for {{ job.query }}</title>
-  <link rel="stylesheet" href="/static/styles.css">
+  <title>{{ job.query }} — Social Insight Lab</title>
+  <link rel="stylesheet" href="/static/styles.css?v=3">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  {% if still_running %}<meta http-equiv="refresh" content="6">{% endif %}
 </head>
 <body>
-  <header>
-    <p class="badge">Job #{{ job.id }}</p>
-    <h1>{{ job.query }}</h1>
-    <p style="color:#9ca3af;">Review status, explore sentiment, demographics, and export assets for reporting.</p>
-    <div style="margin-top:10px;">
-      <span class="status-pill status-{{ job.status.value }}">{{ job.status.value.title() }}</span>
-      {% if job.completed_at %}<span class="badge">Completed {{ job.completed_at.strftime('%Y-%m-%d %H:%M') }}</span>{% endif %}
-    </div>
-  </header>
 
-  <div class="container grid two">
-    <div class="card">
-      <div class="banner">
-        <div>
-          <strong>Collection scope</strong>
-          <p style="margin:4px 0; color:#9ca3af;">{{ job.limit }} recent records targeted across news, social, and video sources.</p>
-        </div>
-        <div class="actions">
-          <a href="/">Launch another</a>
-          {% if analysis %}
-          <a href="/jobs/{{ job.id }}/export/csv">Export CSV</a>
-          <a href="/jobs/{{ job.id }}/export/pdf">Download PDF</a>
-          {% endif %}
-        </div>
+{% if still_running %}<div class="prog-bar"></div>{% endif %}
+
+<!-- ── Nav ──────────────────────────────────────────────────────────────── -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="/" class="nav-brand">
+      <span class="nav-logo">◎</span>
+      Social Insight Lab
+    </a>
+    <a href="/" class="nav-back">← Dashboard</a>
+  </div>
+</nav>
+
+<!-- ── Job header ───────────────────────────────────────────────────────── -->
+<div class="job-hdr fade-up">
+  <div class="breadcrumb">
+    <a href="/">Dashboard</a>
+    <span class="bc-sep">/</span>
+    <span>Job #{{ job.id }}</span>
+  </div>
+  <div class="job-title-row">
+    <div>
+      <div class="job-title">{{ job.query }}</div>
+      <div class="job-meta">
+        <span class="pill pill-{{ job.status.value }}">{{ job.status.value.title() }}</span>
+        {% if job.completed_at %}
+        <span class="jmeta-sep">·</span>
+        <span class="jmeta-ts">Completed {{ job.completed_at.strftime('%b %d %Y, %H:%M') }}</span>
+        {% endif %}
+        {% if still_running %}
+        <span class="jmeta-sep">·</span>
+        <span style="font-size:.81rem;color:var(--blue);">Auto-refreshing every 6 s</span>
+        {% endif %}
       </div>
-
-      {% if not analysis %}
-        <p style="color:#9ca3af; margin-top:12px;">Data collection and analysis are running. Refresh in a moment.</p>
-      {% else %}
-        <div class="grid two" style="margin-top:16px;">
-          <div class="stat">
-            <h3>Records analyzed</h3>
-            <strong>{{ analysis.total_count }}</strong>
-          </div>
-          <div class="stat">
-            <h3>Average sentiment</h3>
-            <strong>{{ '%.2f' % analysis.average_score }}</strong>
-          </div>
-          <div class="stat">
-            <h3>Positive</h3>
-            <strong style="color:#22c55e;">{{ analysis.positive_count }}</strong>
-          </div>
-          <div class="stat">
-            <h3>Neutral</h3>
-            <strong style="color:#f97316;">{{ analysis.neutral_count }}</strong>
-          </div>
-          <div class="stat">
-            <h3>Negative</h3>
-            <strong style="color:#f87171;">{{ analysis.negative_count }}</strong>
-          </div>
-        </div>
-      {% endif %}
     </div>
-
-    <div class="card">
-      <h3>Recent mentions (sample)</h3>
-      {% if posts_preview %}
-      <table>
-        <thead><tr><th>Source</th><th>Region</th><th>Sentiment</th><th>Content</th></tr></thead>
-        <tbody>
-          {% for post in posts_preview %}
-          <tr>
-            <td>{{ post.source }}</td>
-            <td>{{ post.author_location }}</td>
-            <td>{{ post.sentiment_label.title() }}</td>
-            <td>{{ post.content }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-      {% else %}
-      <p style="color:#9ca3af;">Data still loading.</p>
-      {% endif %}
+    <div class="job-acts">
+      <form method="post" action="/jobs/{{ job.id }}/retry" style="display:contents;">
+        <button type="submit" class="btn btn-outline-ind btn-sm">↺ Run Again</button>
+      </form>
+      <form method="post" action="/jobs/{{ job.id }}/delete" style="display:contents;"
+            onsubmit="return confirm('Permanently delete job #{{ job.id }}?')">
+        <button type="submit" class="btn btn-red btn-sm">⊗ Delete</button>
+      </form>
     </div>
   </div>
+</div>
 
-  {% if analysis %}
-  <div class="container card">
-    <h2>Visual intelligence</h2>
-    <div class="grid two">
-      <div class="chart">
-        <img src="data:image/png;base64,{{ analysis.charts_dict()['sentiment'] }}" alt="Sentiment Chart" style="width:100%; border-radius:10px;" />
-      </div>
-      <div class="chart">
-        <img src="data:image/png;base64,{{ analysis.charts_dict()['sources'] }}" alt="Source Chart" style="width:100%; border-radius:10px;" />
-      </div>
-      <div class="chart">
-        <img src="data:image/png;base64,{{ analysis.charts_dict()['locations'] }}" alt="Location Chart" style="width:100%; border-radius:10px;" />
-      </div>
-      <div class="chart">
-        <img src="data:image/png;base64,{{ analysis.charts_dict()['timeline'] }}" alt="Timeline Chart" style="width:100%; border-radius:10px;" />
-      </div>
-    </div>
-    <div class="actions" style="margin-top:12px;">
-      <a href="/jobs/{{ job.id }}/export/chart/sentiment">Save sentiment chart</a>
-      <a href="/jobs/{{ job.id }}/export/chart/locations">Save demographics chart</a>
-      <a href="/jobs/{{ job.id }}/export/chart/sources">Save source chart</a>
-      <a href="/jobs/{{ job.id }}/export/chart/timeline">Save timeline chart</a>
-    </div>
-  </div>
-
-  <div class="container grid two">
-    <div class="card">
-      <h3>Top regions</h3>
-      <table>
-        <thead><tr><th>Region</th><th>Mentions</th></tr></thead>
-        <tbody>
-          {% for loc, count in analysis.top_locations_dict().items() %}
-          <tr><td>{{ loc }}</td><td>{{ count }}</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    <div class="card">
-      <h3>Top sources</h3>
-      <table>
-        <thead><tr><th>Channel</th><th>Mentions</th></tr></thead>
-        <tbody>
-          {% for src, count in analysis.top_sources_dict().items() %}
-          <tr><td>{{ src }}</td><td>{{ count }}</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
+<!-- ── Alerts ────────────────────────────────────────────────────────────── -->
+<div class="wrap" style="margin-bottom:16px;">
+  {% if still_running %}
+  <div class="proc-card fade-up">
+    <div class="proc-spin"></div>
+    <div>
+      <div class="proc-text">Collecting and analysing posts across all sources…</div>
+      <div style="font-size:.77rem;color:var(--muted);margin-top:3px;">Page refreshes automatically every 6 seconds.</div>
     </div>
   </div>
   {% endif %}
 
-  <div class="footer">Need alerts? Wire up Notifier to email, Slack, or webhooks for instant delivery.</div>
+  {% if job.status.value == 'failed' and job.message %}
+  <div class="err-card fade-up">
+    <div class="err-title">⚠ Job failed</div>
+    <div class="err-msg">{{ job.message }}</div>
+  </div>
+  {% endif %}
+</div>
+
+{% if analysis %}
+{% set charts  = analysis.charts_dict() %}
+{% set src_geo = analysis.source_sentiments_dict() %}
+{% set tot     = analysis.total_count %}
+{% set pos_pct = (analysis.positive_count / tot * 100) if tot > 0 else 0 %}
+{% set neu_pct = (analysis.neutral_count  / tot * 100) if tot > 0 else 0 %}
+{% set neg_pct = (analysis.negative_count / tot * 100) if tot > 0 else 0 %}
+
+<!-- ── 5 Stat Cards ──────────────────────────────────────────────────────── -->
+<div class="stat-grid fade-up">
+  <div class="scard sc-ind">
+    <div class="scard-lbl">Records</div>
+    <div class="scard-val cv-ind">{{ "{:,}".format(tot) }}</div>
+    <div class="scard-sub">posts analysed</div>
+  </div>
+  <div class="scard sc-grn">
+    <div class="scard-lbl">Positive</div>
+    <div class="scard-val cv-grn">{{ "{:,}".format(analysis.positive_count) }}</div>
+    <div class="scard-sub">{{ "%.1f"|format(pos_pct) }}% of total</div>
+  </div>
+  <div class="scard sc-amb">
+    <div class="scard-lbl">Neutral</div>
+    <div class="scard-val cv-amb">{{ "{:,}".format(analysis.neutral_count) }}</div>
+    <div class="scard-sub">{{ "%.1f"|format(neu_pct) }}% of total</div>
+  </div>
+  <div class="scard sc-red">
+    <div class="scard-lbl">Negative</div>
+    <div class="scard-val cv-red">{{ "{:,}".format(analysis.negative_count) }}</div>
+    <div class="scard-sub">{{ "%.1f"|format(neg_pct) }}% of total</div>
+  </div>
+  <div class="scard sc-blu">
+    <div class="scard-lbl">Avg Score</div>
+    <div class="scard-val
+      {% if analysis.average_score > 0.05 %}cv-grn
+      {% elif analysis.average_score < -0.05 %}cv-red
+      {% else %}cv-amb{% endif %}">
+      {{ "%+.4f"|format(analysis.average_score) }}
+    </div>
+    <div class="scard-sub">sentiment index</div>
+  </div>
+</div>
+
+<!-- ── Sentiment bar ─────────────────────────────────────────────────────── -->
+<div class="wrap fade-up" style="margin-bottom:20px;">
+  <div class="card">
+    <div class="card-title" style="margin-bottom:16px;">Sentiment Distribution</div>
+    <div>
+      <div class="sbar-label">Overall breakdown</div>
+      <div class="sbar">
+        <div class="sbar-pos" style="width:{{ pos_pct }}%;"></div>
+        <div class="sbar-neu" style="width:{{ neu_pct }}%;"></div>
+        <div class="sbar-neg" style="width:{{ neg_pct }}%;"></div>
+      </div>
+      <div class="sbar-leg">
+        <span><span class="sbdot" style="background:var(--green);"></span> Positive — {{ "{:,}".format(analysis.positive_count) }} ({{ "%.1f"|format(pos_pct) }}%)</span>
+        <span><span class="sbdot" style="background:var(--amber);"></span> Neutral — {{ "{:,}".format(analysis.neutral_count) }} ({{ "%.1f"|format(neu_pct) }}%)</span>
+        <span><span class="sbdot" style="background:var(--red);"></span> Negative — {{ "{:,}".format(analysis.negative_count) }} ({{ "%.1f"|format(neg_pct) }}%)</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endif %}<!-- /analysis -->
+
+<!-- ── Recent Mentions ───────────────────────────────────────────────────── -->
+<div class="wrap fade-up" style="margin-bottom:20px;">
+  <div class="card">
+    <div class="card-hd">
+      <div class="card-title">Recent Mentions</div>
+      <span style="font-size:.77rem;color:var(--muted);">latest 10 posts</span>
+    </div>
+    {% if posts_preview %}
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Source</th>
+            <th>Author</th>
+            <th>Sentiment</th>
+            <th>Score</th>
+            <th>Content preview</th>
+            <th>Link</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for post in posts_preview %}
+          <tr>
+            <td><span class="sbadge">{{ post.source }}</span></td>
+            <td style="font-size:.79rem;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-2);">
+              {{ post.author_location[:20] }}
+            </td>
+            <td>
+              {% if post.sentiment_label == 'positive' %}
+                <span class="chip chip-pos">▲ Positive</span>
+              {% elif post.sentiment_label == 'negative' %}
+                <span class="chip chip-neg">▼ Negative</span>
+              {% else %}
+                <span class="chip chip-neu">● Neutral</span>
+              {% endif %}
+            </td>
+            <td style="font-variant-numeric:tabular-nums;font-size:.81rem;font-weight:700;
+              {% if post.sentiment_score > 0.05 %}color:var(--green)
+              {% elif post.sentiment_score < -0.05 %}color:var(--red)
+              {% else %}color:var(--amber){% endif %}">
+              {{ "%+.3f"|format(post.sentiment_score) }}
+            </td>
+            <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.81rem;color:var(--text-2);">
+              {{ post.content[:110] }}
+            </td>
+            <td>
+              {% if post.url %}
+              <a class="alink" href="{{ post.url }}" target="_blank" rel="noopener noreferrer">↗ Open</a>
+              {% else %}
+              <span style="color:var(--muted);font-size:.75rem;">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p style="color:var(--muted);padding:16px 0;font-size:.85rem;">Data still loading…</p>
+    {% endif %}
+  </div>
+</div>
+
+{% if analysis %}
+
+<!-- ── Source Map ────────────────────────────────────────────────────────── -->
+<div class="wrap fade-up" style="margin-bottom:20px;">
+  <div class="card">
+    <div class="card-hd">
+      <div class="card-title">Source Locations</div>
+      <span style="font-size:.77rem;color:var(--muted);">
+        <span style="color:var(--green);">●</span> positive &nbsp;
+        <span style="color:var(--amber);">●</span> neutral &nbsp;
+        <span style="color:var(--red);">●</span> negative
+        &nbsp;·&nbsp; pin size = post volume
+      </span>
+    </div>
+    <div id="source-map"></div>
+    <script>
+    (function(){
+      var d = {{ src_geo | tojson }};
+      var map = L.map('source-map',{center:[20,10],zoom:2,attributionControl:true});
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+        attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>', maxZoom:19
+      }).addTo(map);
+      Object.entries(d).forEach(function([src,v]){
+        var tot=v.total||1;
+        var col=(v.positive>=v.negative&&v.positive>=v.neutral)?'#10b981'
+               :(v.negative>v.positive&&v.negative>v.neutral)?'#ef4444':'#f59e0b';
+        var r=Math.max(6,Math.min(44,Math.sqrt(tot)*3.5));
+        var mk=L.circleMarker([v.lat,v.lng],{
+          radius:r,fillColor:col,color:'rgba(255,255,255,.2)',weight:1.5,fillOpacity:.85
+        }).addTo(map);
+        var p=function(n){return tot?((n/tot)*100).toFixed(1)+'%':'0%';};
+        mk.bindPopup(
+          '<div style="min-width:175px;font-family:system-ui,sans-serif;font-size:.82rem;">'+
+          '<div style="color:#6366f1;font-weight:700;font-size:.88rem;margin-bottom:2px;">'+src+'</div>'+
+          (v.city?'<div style="color:#4a5280;font-size:.74rem;margin-bottom:8px;">'+v.city+'</div>':'')+
+          '<table style="width:100%;border-collapse:collapse;">'+
+          '<tr><td style="color:#34d399;padding:2px 0">▲ Positive</td><td style="text-align:right">'+v.positive+' ('+p(v.positive)+')</td></tr>'+
+          '<tr><td style="color:#fbbf24;padding:2px 0">● Neutral</td><td style="text-align:right">'+v.neutral+' ('+p(v.neutral)+')</td></tr>'+
+          '<tr><td style="color:#f87171;padding:2px 0">▼ Negative</td><td style="text-align:right">'+v.negative+' ('+p(v.negative)+')</td></tr>'+
+          '<tr style="border-top:1px solid rgba(255,255,255,.08)"><td style="padding-top:5px;font-weight:700;color:#e2e8ff">Total</td><td style="text-align:right;padding-top:5px;font-weight:700;color:#e2e8ff">'+tot+'</td></tr>'+
+          '</table></div>'
+        );
+      });
+    })();
+    </script>
+  </div>
+</div>
+
+<!-- ── Charts ────────────────────────────────────────────────────────────── -->
+<div class="wrap fade-up" style="margin-bottom:20px;">
+  <div class="card">
+    <div class="card-title" style="margin-bottom:18px;">Intelligence Charts</div>
+    <div class="chart-grid">
+      {% if charts.get('sentiment') %}
+      <div class="chart-card">
+        <div class="chart-lbl">Sentiment Mix</div>
+        <img src="data:image/png;base64,{{ charts.sentiment }}" alt="Sentiment Mix">
+      </div>
+      {% endif %}
+      {% if charts.get('sources') %}
+      <div class="chart-card">
+        <div class="chart-lbl">Source Breakdown</div>
+        <img src="data:image/png;base64,{{ charts.sources }}" alt="Source Breakdown">
+      </div>
+      {% endif %}
+      {% if charts.get('sentiment_by_source') %}
+      <div class="chart-card chart-full">
+        <div class="chart-lbl">Sentiment by Source</div>
+        <img src="data:image/png;base64,{{ charts.sentiment_by_source }}" alt="Sentiment by Source">
+      </div>
+      {% endif %}
+      {% if charts.get('timeline') %}
+      <div class="chart-card chart-full">
+        <div class="chart-lbl">Volume & Sentiment Timeline</div>
+        <img src="data:image/png;base64,{{ charts.timeline }}" alt="Timeline">
+      </div>
+      {% endif %}
+      {% if charts.get('word_freq') %}
+      <div class="chart-card">
+        <div class="chart-lbl">Top Keywords</div>
+        <img src="data:image/png;base64,{{ charts.word_freq }}" alt="Top Keywords">
+      </div>
+      {% endif %}
+      {% if charts.get('score_dist') %}
+      <div class="chart-card">
+        <div class="chart-lbl">Score Distribution</div>
+        <img src="data:image/png;base64,{{ charts.score_dist }}" alt="Score Distribution">
+      </div>
+      {% endif %}
+      {% if charts.get('locations') %}
+      <div class="chart-card">
+        <div class="chart-lbl">Top Authors</div>
+        <img src="data:image/png;base64,{{ charts.locations }}" alt="Top Authors">
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- ── Export ────────────────────────────────────────────────────────────── -->
+<div class="wrap fade-up" style="margin-bottom:20px;">
+  <div class="card">
+    <div class="card-title" style="margin-bottom:18px;">Export Report</div>
+    <div class="export-grid">
+      <a href="/jobs/{{ job.id }}/export/csv" class="exbtn">
+        <span class="ei">📄</span>
+        <strong>CSV Data</strong>
+        <small>All posts + scores</small>
+      </a>
+      <a href="/jobs/{{ job.id }}/export/pdf" class="exbtn">
+        <span class="ei">📑</span>
+        <strong>PDF Report</strong>
+        <small>Summary + charts</small>
+      </a>
+      <a href="/jobs/{{ job.id }}/export/chart/sentiment" class="exbtn">
+        <span class="ei">🥧</span>
+        <strong>Sentiment Pie</strong>
+        <small>PNG image</small>
+      </a>
+      <a href="/jobs/{{ job.id }}/export/chart/sources" class="exbtn">
+        <span class="ei">📡</span>
+        <strong>Sources Bar</strong>
+        <small>PNG image</small>
+      </a>
+      <a href="/jobs/{{ job.id }}/export/chart/sentiment_by_source" class="exbtn">
+        <span class="ei">📊</span>
+        <strong>By-Source</strong>
+        <small>PNG image</small>
+      </a>
+      <a href="/jobs/{{ job.id }}/export/chart/timeline" class="exbtn">
+        <span class="ei">📈</span>
+        <strong>Timeline</strong>
+        <small>PNG image</small>
+      </a>
+      <a href="/jobs/{{ job.id }}/export/chart/word_freq" class="exbtn">
+        <span class="ei">🔤</span>
+        <strong>Keywords</strong>
+        <small>PNG image</small>
+      </a>
+      <a href="/jobs/{{ job.id }}/export/chart/score_dist" class="exbtn">
+        <span class="ei">🎯</span>
+        <strong>Score Dist</strong>
+        <small>PNG image</small>
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- ── Top Authors & Sources ─────────────────────────────────────────────── -->
+<div class="wrap fade-up" style="margin-bottom:48px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;">
+  <div class="card">
+    <div class="card-title" style="margin-bottom:16px;">Top Authors</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Author / Handle</th><th style="text-align:right;">Posts</th></tr></thead>
+        <tbody>
+          {% for loc, count in analysis.top_locations_dict().items() %}
+          <tr>
+            <td style="font-size:.86rem;color:var(--text-2);">{{ loc }}</td>
+            <td class="tnum" style="text-align:right;color:var(--indigo);">{{ count }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title" style="margin-bottom:16px;">Top Sources</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Source</th><th style="text-align:right;">Posts</th></tr></thead>
+        <tbody>
+          {% for src, count in analysis.top_sources_dict().items() %}
+          <tr>
+            <td><span class="sbadge">{{ src }}</span></td>
+            <td class="tnum" style="text-align:right;color:var(--indigo);">{{ count }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% endif %}<!-- /analysis -->
+
+<div class="footer">
+  Reddit · Hacker News · Times of India · NDTV · The Hindu &nbsp;·&nbsp; No API keys required
+</div>
+
 </body>
 </html>
