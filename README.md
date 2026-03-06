@@ -1,59 +1,131 @@
 # Social Insight Lab
 
-A FastAPI-powered sentiment and demographic research tool that simulates large-scale crawling (default 50,000 records), runs exploratory + sentiment analysis, and serves polished dashboards with exportable charts and PDF/CSV outputs.
+> Real-time sentiment intelligence across Reddit, Hacker News and Indian news feeds — no API keys required.
+
+Built with **FastAPI · SQLite · Matplotlib · Jinja2**. Launch a query, get back sentiment breakdowns, keyword trends, a geographic source map, and export-ready reports in seconds.
+
+---
 
 ## Features
-- **Job launcher**: kick off research runs with a phrase and desired volume (defaults to 50,000 records).
-- **Background processing**: simulated multi-source collection (news, social, video) with demographic tags and sentiment labels stored in SQLite.
-- **Analytics**: sentiment mix, regional share, source breakdown, timeline histogram, and summary statistics.
-- **Visualization + exports**: inline charts (Matplotlib), CSV data export, per-chart PNG downloads, and a branded PDF report.
-- **Notifications stub**: plug-in notifier ready to connect to email/SMS/webhooks.
 
-> Note: Data now comes from real APIs (Twitter/X v2 recent search, Reddit via PRAW, and NewsAPI). Provide valid credentials in your environment to collect fresh posts; jobs will fail if no data can be retrieved.
+| | |
+|---|---|
+| 📡 **5 Live Sources** | Reddit (topic-routed across 14 categories), Hacker News (Algolia), Times of India, NDTV, The Hindu |
+| 🧠 **Sentiment Analysis** | Positive / Neutral / Negative per post with compound scoring and negation handling |
+| 📊 **7 Charts** | Sentiment pie · Source breakdown · Sentiment by source · Volume timeline · Top keywords · Score distribution · Top authors |
+| 🗺 **Source Map** | Leaflet.js geographic map — pin size = post volume, color = dominant sentiment |
+| 💾 **Exports** | CSV (all posts + scores) · PDF summary report · Individual chart PNGs |
+| ⚡ **No API keys** | Reddit via public JSON, HN via free Algolia API, RSS direct XML parsing |
 
-## Getting started
+---
 
-### Setup
+## Quick Start
+
 ```bash
+# 1. Clone and set up
+git clone https://github.com/saby-repo/senti-sociac.git
+cd senti-sociac
 python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
 
-### Run the server
-```bash
+# 2. Activate (Windows)
+.venv\Scripts\activate
+# Activate (Mac/Linux)
+source .venv/bin/activate
+
+# 3. Install dependencies
+pip install -r requirements.txt
+
+# 4. Start the server
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
-Open http://localhost:8000 to launch jobs and view dashboards.
 
-### Data store
-- SQLite file `app.db` created automatically on startup.
-- Tables: `jobs`, `posts`, and `analyses` (SQLAlchemy models in `app/models.py`).
+Open **http://localhost:8000**, type a query (e.g. `EV charging`, `ChatGPT`, `iran missile`), and hit **Launch Analysis**.
 
-### Exports
-- CSV: `/jobs/{id}/export/csv`
-- PDF report: `/jobs/{id}/export/pdf`
-- Individual charts (PNG): `/jobs/{id}/export/chart/{sentiment|locations|sources|timeline}`
+### Environment (optional)
 
-## Testing
-```bash
-pytest
+Copy `.env.example` to `.env`. The only variable you may want to set is:
+
+```
+DATABASE_URL=sqlite:///./app.db   # default — no change needed
 ```
 
-## Project layout
-- `app/main.py` — FastAPI routes, background executor, export endpoints.
-- `app/services/collector.py` — synthetic multi-source crawler.
-- `app/services/analyzer.py` — sentiment + demographic analytics and chart rendering.
-- `app/templates/` — Jinja2 templates for the dashboard.
-- `app/static/styles.css` — Dark UI styling.
+No Twitter/Reddit/NewsAPI credentials are required.
+
+---
+
+## How It Works
+
+```
+Query → Collector (ThreadPoolExecutor, 8 workers)
+          ├── RedditClient     — 50% budget, topic-routed subreddits, cursor pagination
+          ├── HackerNewsClient — 25% budget, Algolia search API
+          └── NewsRSSClient    — 25% budget, Times of India · NDTV · The Hindu
+       → Deduplication by title[:120]
+       → SimpleSentimentAnalyzer (VADER-style compound scoring)
+       → Matplotlib charts (thread-safe, base64 encoded)
+       → SQLite (Jobs · Posts · Analyses)
+       → Jinja2 dashboard
+```
+
+Budget split, concurrency, and source routing are all configurable inside `app/services/collector.py`.
+
+---
+
+## Project Layout
+
+```
+senti-sociac/
+├── app/
+│   ├── main.py              # FastAPI routes, process_job(), export endpoints
+│   ├── models.py            # Job, Post, Analysis (SQLAlchemy)
+│   ├── database.py          # Engine, SessionLocal, migrations
+│   ├── services/
+│   │   ├── collector.py     # SubredditRouter, RedditClient, HackerNewsClient, NewsRSSClient
+│   │   ├── analyzer.py      # Sentiment scoring, 7 Matplotlib charts, geo mapping
+│   │   └── notifier.py      # Stub notifier (stdout; wire to email/Slack/webhook)
+│   ├── templates/
+│   │   ├── index.html       # Landing: hero search, feature grid, jobs table
+│   │   └── job.html         # Job detail: stat cards, sentiment bar, map, charts, exports
+│   └── static/
+│       └── styles.css       # Premium light theme (Inter, indigo/cyan accents)
+├── tests/
+│   ├── conftest.py          # In-memory SQLite fixtures
+│   ├── test_collector.py    # 24 tests — router, RSS, HN, integration, sentiment
+│   └── test_pipeline.py     # 5 tests — process_job, exports, health, validation
+├── .env.example
+└── requirements.txt
+```
+
+---
+
+## API & Export Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/` | Dashboard — recent jobs |
+| `POST` | `/jobs` | Launch a new analysis job |
+| `GET` | `/jobs/{id}` | Job detail with charts and map |
+| `POST` | `/jobs/{id}/retry` | Re-run an existing job |
+| `POST` | `/jobs/{id}/delete` | Delete a job and its data |
+| `GET` | `/jobs/{id}/export/csv` | Download all posts as CSV |
+| `GET` | `/jobs/{id}/export/pdf` | Download PDF summary report |
+| `GET` | `/jobs/{id}/export/chart/{name}` | Download a chart PNG (`sentiment`, `sources`, `sentiment_by_source`, `timeline`, `word_freq`, `score_dist`, `locations`) |
+| `GET` | `/health` | Health check |
+
+---
+
+## Running Tests
+
+```bash
+# All 29 tests (no server needed, uses in-memory SQLite)
+.venv/Scripts/python -m pytest tests/ -v
+```
+
+---
 
 ## Extending
-- Configure additional sources by extending `Collector` with more API clients and normalizers.
-- Required environment variables:
-  - `TWITTER_BEARER_TOKEN`
-  - `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USER_AGENT`
-  - `NEWSAPI_KEY`
-- Install the optional `praw` dependency (`pip install praw`) to enable Reddit collection.
-- Add your own sentiment model by swapping `SimpleSentimentAnalyzer` with a richer classifier.
-- Wire `Notifier` to email/SMS/Slack for alerting when jobs finish.
-- Scale out with a queue (Celery/RQ) and cloud database for production volume.
+
+- **Add a source** — implement a client with a `collect(query, limit) -> list[dict]` interface and register it in `Collector`.
+- **Swap the sentiment model** — replace `SimpleSentimentAnalyzer` in `analyzer.py` with any model that returns a compound score in `[-1, 1]`.
+- **Add notifications** — wire `Notifier` in `notifier.py` to email, Slack, or webhooks.
+- **Scale out** — swap `ThreadPoolExecutor` for Celery/RQ and SQLite for Postgres for production volume.
